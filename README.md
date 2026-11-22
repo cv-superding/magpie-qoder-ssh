@@ -2,8 +2,9 @@
 
 ![qoder-ssh banner](docs/assets/banner-qoder-ssh.png)
 
+<img src="https://img.shields.io/badge/license-MIT-blue" alt="license"> <img src="https://img.shields.io/badge/magpie-plugin-brightgreen" alt="magpie"> <img src="https://img.shields.io/badge/SSH-tunnel-purple" alt="SSH"> <img src="https://img.shields.io/badge/node-%3E%3D22-grey" alt="node"> <img src="https://img.shields.io/badge/PRs-welcome-orange" alt="PRs">
+
 <img src="docs/assets/icon-qoder-ssh.png" alt="qoder-ssh icon" width="96" align="right">
-![license](https://img.shields.io/badge/license-MIT-blue) ![magpie](https://img.shields.io/badge/magpie-plugin-brightgreen) ![SSH](https://img.shields.io/badge/SSH-tunnel-purple) ![node](https://img.shields.io/badge/node-%3E%3D22-grey) ![PRs](https://img.shields.io/badge/PRs-welcome-orange)
 
 
 一个 [magpie](https://github.com/) 插件，通过 SSH 管理远端机器上的 [qoderclicn](https://qoder.com/)：连通性检测、一键安装配置、以及一条 SSH 远程转发隧道。
