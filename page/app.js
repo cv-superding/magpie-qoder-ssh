@@ -55,8 +55,12 @@ const testingIds = new Set()
 // 已提交部署、等后端接手的 id
 const pendingDeploy = new Set()
 
-function readServers(opts) {
-  return Array.isArray(opts && opts.servers) ? opts.servers.slice() : []
+function readServers(opts, snap) {
+  // 优先 options；bridge 读不到时用快照兜底（快照里也带 servers）
+  const fromOpts = Array.isArray(opts && opts.servers) ? opts.servers : null
+  if (fromOpts && fromOpts.length) return fromOpts.slice()
+  const s = snap || snapshot()
+  return Array.isArray(s.servers) ? s.servers.slice() : []
 }
 
 function renderServers(servers, snap) {
@@ -239,9 +243,9 @@ async function refresh() {
     depKeyInput.value = opts.deployKey
   }
 
-  renderServers(readServers(opts), snap)
+  renderServers(readServers(opts, snap), snap)
   renderTestResult(snap.testResult)
-  renderTunnel(snap.tunnel, opts, readServers(opts))
+  renderTunnel(snap.tunnel, opts, readServers(opts, snap))
   renderLog(snap.log, opts)
 
   // 日志设置回填
@@ -263,7 +267,13 @@ function renderTunnel(tun, opts, servers) {
   const info = document.getElementById("tun-info")
   if (!sel || !btn) return
 
-  const cfg = opts.tunnel || {}
+  // options 读不到时，用快照里的隧道运行状态兜底（至少有 serverId/端口）
+  const cfg = (opts && opts.tunnel) || (tun ? {
+    serverId: tun.id || tun.serverId,
+    remotePort: tun.remotePort,
+    localPort: tun.localPort,
+    enabled: !!tun.running,
+  } : {})
 
   // 服务器下拉（保留当前选择）
   const want = cfg.serverId || sel.value
@@ -357,18 +367,26 @@ function renderTestResult(trOrAll) {
 }
 
 async function main() {
+  // magpie.ready 在某些 web 视图下可能永久 pending；加超时兜底，
+  // 否则整个 main 卡在第一行，下面所有按钮事件都不会绑定（表现为按钮全死）。
   try {
-    await magpie.ready
+    await Promise.race([
+      magpie.ready,
+      new Promise((r) => setTimeout(r, 2000)),
+    ])
   } catch (e) {
     // ready 失败也继续，下面操作会自己报错
   }
 
   // 页面初次加载时 <script src="snapshot.js"> 会命中浏览器缓存，
   // 而后端每次 tick 都会重写这个文件（尤其 magpie 重启后）。
-  // 这里主动带时间戳重载一次，避免显示过期的 at=0 / "等待后端读取"。
-  // 注意：首次刷新失败绝不能阻断下面的事件绑定，否则所有按钮都点不动。
+  // 带时间戳重载一次；失败也不能阻断下面的事件绑定。
   try {
     await reloadSnapshot()
+  } catch (e) {
+    console.warn("qoder-ssh: snapshot reload failed", e)
+  }
+  try {
     await refresh()
   } catch (e) {
     console.warn("qoder-ssh: initial refresh failed", e)
