@@ -1,5 +1,11 @@
 # qoder-ssh
 
+![qoder-ssh banner](docs/assets/banner-qoder-ssh.png)
+
+<img src="docs/assets/icon-qoder-ssh.png" alt="qoder-ssh icon" width="96" align="right">
+![license](https://img.shields.io/badge/license-MIT-blue) ![magpie](https://img.shields.io/badge/magpie-plugin-brightgreen) ![SSH](https://img.shields.io/badge/SSH-tunnel-purple) ![node](https://img.shields.io/badge/node-%3E%3D22-grey) ![PRs](https://img.shields.io/badge/PRs-welcome-orange)
+
+
 一个 [magpie](https://github.com/) 插件，通过 SSH 管理远端机器上的 [qoderclicn](https://qoder.com/)：连通性检测、一键安装配置、以及一条 SSH 远程转发隧道。
 
 > **v3.0.0 起，网关桥接已拆到独立插件 [magpie-gateway](https://github.com/cv-superding/magpie-gateway)**。本插件不再注册 provider，只负责 SSH 管理。两个插件互相独立，按需安装。
