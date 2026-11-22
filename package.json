@@ -1,7 +1,7 @@
 {
   "name": "qoder-ssh",
-  "version": "2.7.0",
-  "description": "qoder-ssh: bridge a magpie gateway into magpie as a provider, plus a page to manage SSH servers and configure qoderclicn on them",
+  "version": "3.0.0",
+  "description": "magpie plugin: manage SSH servers, check and deploy qoderclicn, and run an ssh -R tunnel",
   "type": "module",
   "main": "./index.mjs",
   "files": [
@@ -21,16 +21,14 @@
     "opencode-plugin",
     "magpie",
     "magpie-plugin",
-    "gateway",
-    "openai-compatible",
     "ssh"
   ],
   "license": "MIT",
   "magpie": {
     "name": "qoder-ssh",
     "summary": {
-      "en": "Bridge a magpie gateway as a provider, and manage SSH servers that run qoderclicn",
-      "zh": "把 magpie 网关桥接成 provider，并管理运行 qoderclicn 的 SSH 服务器"
+      "en": "Manage SSH servers that run qoderclicn, with an ssh -R tunnel",
+      "zh": "管理运行 qoderclicn 的 SSH 服务器，含 ssh -R 隧道"
     },
     "page": {
       "title": "qoder-ssh",
@@ -43,5 +41,9 @@
     },
     "maxConcurrency": 8,
     "agent": "./agent.mjs"
+  },
+  "summary": {
+    "en": "Manage SSH servers: detect, deploy qoderclicn and run ssh -R tunnels",
+    "zh": "管理 SSH 服务器：检测、部署 qoderclicn 与建立 ssh -R 隧道"
   }
 }

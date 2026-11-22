@@ -230,16 +230,8 @@ async function refresh() {
   const opts = (await magpie.options.get()) || {}
   const snap = snapshot()
 
-  const urlInput = document.getElementById("gw-url")
-  const keyInput = document.getElementById("gw-key")
   const depUrlInput = document.getElementById("dep-url")
   const depKeyInput = document.getElementById("dep-key")
-  if (urlInput && !urlInput.dataset.touched) {
-    urlInput.value = opts.url || (snap.gateway && snap.gateway.url) || ""
-  }
-  if (keyInput && !keyInput.dataset.touched && opts.key) {
-    keyInput.value = opts.key
-  }
   if (depUrlInput && !depUrlInput.dataset.touched) {
     depUrlInput.value = opts.deployUrl || (snap.gateway && snap.gateway.deployUrl) || ""
   }
@@ -375,15 +367,11 @@ async function main() {
   const saveGw = document.getElementById("save-gw")
   if (saveGw) {
     saveGw.addEventListener("click", async () => {
-      const url = (document.getElementById("gw-url") || {}).value || ""
-      const key = (document.getElementById("gw-key") || {}).value || ""
       const depUrl = (document.getElementById("dep-url") || {}).value || ""
       const depKey = (document.getElementById("dep-key") || {}).value || ""
       saveGw.disabled = true
       try {
         await saveOptions({
-          url: url.trim(),
-          key: key.trim(),
           deployUrl: depUrl.trim(),
           deployKey: depKey.trim(),
         })
@@ -398,7 +386,7 @@ async function main() {
   }
 
   // 输入框标记 touched，避免轮询把手输的值冲掉
-  for (const id of ["gw-url", "gw-key", "dep-url", "dep-key"]) {
+  for (const id of ["dep-url", "dep-key"]) {
     const n = document.getElementById(id)
     if (n) n.addEventListener("input", () => { n.dataset.touched = "1" })
   }

@@ -1,10 +1,10 @@
 // qoder-ssh — magpie 插件
 //
-// 两件事：
-//   1) 把一台 magpie 网关（OpenAI 兼容，默认 127.0.0.1:3425）桥接成 provider `mgw`，
-//      让所有 agent 能用网关里的模型；模型列表从网关 /v1/models 实时生成。
-//   2) 带一个管理页（page/），管理多台 SSH 服务器：增删改、连通性检测、
-//      一键在该服务器上装/配 qoderclicn。
+// 一件事：
+//   带一个管理页（page/），管理多台 SSH 服务器：增删改、连通性检测、
+//   一键在该服务器上装/配 qoderclicn，以及建立 ssh -R 隧道。
+//
+// provider 桥接（mgw）已拆到独立的 magpie-gateway 插件。
 //
 // 页面 sandbox 是 connect-src 'none'，不能发网络请求；它只能：
 //   · 读写本插件自己的 options（plugins.json）
@@ -24,50 +24,19 @@ import { probeServer, runRemote } from "./lib/ssh.mjs"
 import { readSecrets, removeSecret, secretPresence, setSecret } from "./lib/secrets.mjs"
 import { startTunnel, stopTunnel, tunnelState, stopAllTunnels } from "./lib/tunnel.mjs"
 
-const PROVIDER = "mgw"
-const ENV_BASE = process.env.MAGPIE_GATEWAY_URL || "http://127.0.0.1:3425"
-const ENV_KEY = process.env.MAGPIE_GATEWAY_KEY || "magpie"
-
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SNAPSHOT_FILE = join(HERE, "page", "snapshot.js")
 const SELF_NAME = "qoder-ssh"
+// 部署到远端时用的网关地址（告诉远端 qoderclicn 连哪里），与 provider 桥接无关
+const ENV_BASE = process.env.MAGPIE_GATEWAY_URL || "http://127.0.0.1:3425"
+const ENV_KEY = process.env.MAGPIE_GATEWAY_KEY || "magpie"
 
+// ── 读本插件在 plugins.json 里的 options ────────────────────────────────
+// 直接读文件而不是等 hook：定时器里没有 hook 上下文。
 function stripSlash(u) {
   return String(u || "").replace(/\/+$/, "")
 }
 
-function modelShape(m) {
-  const id = m.id
-  const context = Number(m.context_window || m.context_length || 1000000)
-  const output = Number(m.max_output_tokens || 32000)
-  let levels = Array.isArray(m.reasoning_levels)
-    ? m.reasoning_levels
-    : (m.supported_reasoning_levels || []).map((x) => x && x.effort).filter(Boolean)
-  levels = levels.filter((lv) => String(lv).toLowerCase() !== "none")
-  const inputs = (m.modalities && m.modalities.input) || []
-  const variants = {}
-  for (const lv of levels) variants[String(lv)] = {}
-
-  return {
-    id,
-    name: m.display_name || m.name || id,
-    limit: { context, output },
-    capabilities: {
-      reasoning: levels.length > 0,
-      toolcall: !!m.tool_call,
-      input: {
-        text: true,
-        image: inputs.includes("image"),
-        video: inputs.includes("video"),
-        pdf: inputs.includes("pdf"),
-      },
-    },
-    ...(levels.length ? { variants } : {}),
-  }
-}
-
-// ── 读本插件在 plugins.json 里的 options ────────────────────────────────
-// 直接读文件而不是等 hook：定时器里没有 hook 上下文。
 function magpieConfigDir() {
   return process.env.XDG_CONFIG_HOME
     ? join(process.env.XDG_CONFIG_HOME, "magpie")
@@ -640,104 +609,8 @@ function startWorker(client) {
 }
 
 // ── 插件本体 ────────────────────────────────────────────────────────────
-// 判断某个网关地址是不是"本机自己"：指向本机时，把它再包成 provider 毫无意义
-// （模型是原有模型的副本、只是多个 mgw/ 前缀，还多一跳转发）。
-function localGatewayPort() {
-  try {
-    const p = join(magpieConfigDir(), "gateway.json")
-    if (existsSync(p)) {
-      const d = JSON.parse(readFileSync(p, "utf8"))
-      const m = String(d && d.addr ? d.addr : "").match(/:(\d+)\s*$/)
-      if (m) return Number(m[1])
-    }
-  } catch {}
-  return 0
-}
-
-function isSelfGateway(url) {
-  const u = String(url || "").replace(/\/+$/, "")
-  const m = u.match(/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\]):(\d+)$/)
-  if (!m) return false
-  const port = Number(m[2])
-  const own = localGatewayPort()
-  // 自己的端口；再兜上 magpie 默认的 3425/3426，防止 gateway.json 还没写
-  return port === own || port === 3425 || port === 3426
-}
-
-export const QoderSsh = async ({ client }, options = {}) => {
-  const DEFAULT_BASE = stripSlash((options && options.url) || ENV_BASE) || "http://127.0.0.1:3425"
-  const DEFAULT_KEY = (options && options.key) || ENV_KEY
-
+export const QoderSsh = async ({ client }, _options = {}) => {
   startWorker(client)
-
-  // 没显式配置 url，且默认地址就是本机网关 → 不注册 provider（避免自己包自己）。
-  // 显式配了 url 的（比如飞牛指向 Win11 的 <gateway-host>:3425）照常注册。
-  const SELF_LOOP = !(options && options.url) && isSelfGateway(DEFAULT_BASE)
-  if (SELF_LOOP) {
-    console.log("qoder-ssh: gateway is this machine, provider not registered (avoids self-loop)")
-    return { config: async (cfg) => cfg }
-  }
-
-  const config = async (cfg) => {
-    cfg.provider ??= {}
-    if (!cfg.provider[PROVIDER]) {
-      cfg.provider[PROVIDER] = {
-        name: "Magpie Gateway",
-        npm: "@ai-sdk/openai-compatible",
-        api: stripSlash(DEFAULT_BASE) + "/v1",
-        models: {},
-      }
-    }
-    return cfg
-  }
-
-  const auth = {
-    provider: PROVIDER,
-    methods: [
-      { type: "api", label: "Magpie gateway key", placeholder: DEFAULT_KEY },
-    ],
-    async loader(getAuth) {
-      const a = await getAuth()
-      const key = (a && (a.key || a.apiKey)) || DEFAULT_KEY
-      const base = stripSlash(DEFAULT_BASE)
-      return {
-        baseURL: base + "/v1",
-        async fetch(input, init) {
-          const headers = new Headers(init && init.headers ? init.headers : {})
-          if (!headers.has("authorization")) {
-            headers.set("authorization", `Bearer ${key}`)
-          }
-          headers.set("x-qoder-ssh", "2.0.0")
-          return fetch(input, { ...(init || {}), headers })
-        },
-      }
-    },
-  }
-
-  const provider = {
-    id: PROVIDER,
-    async models(provider, { auth: accountAuth } = {}) {
-      const base = stripSlash(DEFAULT_BASE)
-      const key = (accountAuth && (accountAuth.key || accountAuth.apiKey)) || DEFAULT_KEY
-      try {
-        const res = await fetch(base + "/v1/models", {
-          headers: { authorization: `Bearer ${key}` },
-        })
-        if (!res.ok) return provider.models
-        const data = await res.json()
-        const list = Array.isArray(data && data.data) ? data.data : []
-        if (!list.length) return provider.models
-        const out = {}
-        for (const m of list) {
-          if (!m || !m.id) continue
-          out[m.id] = modelShape(m)
-        }
-        return out
-      } catch {
-        return provider.models
-      }
-    },
-  }
-
-  return { config, auth, provider }
+  // 纯管理插件：不注册任何 provider（网关桥接在 magpie-gateway 插件里）。
+  return {}
 }

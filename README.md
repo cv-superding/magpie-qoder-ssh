@@ -1,20 +1,21 @@
 # qoder-ssh
 
-一个 [magpie](https://github.com/) 插件，把 **OpenAI 兼容网关**桥接成 magpie 的 provider，并提供一个管理页面，通过 SSH 管理远端机器上的 [qoderclicn](https://qoder.com/)：连通性检测、一键安装配置、以及一条 SSH 远程转发隧道。
+一个 [magpie](https://github.com/) 插件，通过 SSH 管理远端机器上的 [qoderclicn](https://qoder.com/)：连通性检测、一键安装配置、以及一条 SSH 远程转发隧道。
+
+> **v3.0.0 起，网关桥接已拆到独立插件 [magpie-gateway](../magpie-gateway/)**。本插件不再注册 provider，只负责 SSH 管理。两个插件互相独立，按需安装。
 
 适用于这类场景：
 
-- 你有一台常开的机器（如 NAS、服务器）跑着 magpie 网关，想让**另一台机器**的 agent 用它的模型
 - 你有多台 SSH 服务器，需要在上面统一部署 qoderclicn
 - 远端服务器没有公网 IP，需要一个反向隧道访问本机网关
+- 需要批量检测远端的 qoderclicn 安装与配置状态
+
+若只是想把网关接进 magpie 给 agent 用，装 [magpie-gateway](../magpie-gateway/) 即可，不需要本插件。
 
 ## 特性
 
 | 能力 | 说明 |
 |---|---|
-| 网关桥接 | 把网关注册为 provider `mgw`，模型列表从 `/v1/models` 实时拉取 |
-| 能力映射 | 上下文长度、思考档位、工具调用、视觉能力自动映射到 magpie |
-| 自环保护 | 网关指向本机时自动禁用 provider，避免"自己包自己" |
 | 服务器管理 | 页面增删改 SSH 服务器，密码存在独立密钥文件，不写进配置 |
 | 逐项检测 | 检测 SSH / 系统 / 下载工具 / qoderclicn / 配置 / 网关连通性 |
 | 一键配置 | 远端自动安装 qoderclicn，写入带完整能力声明的 `settings.json`，带分步进度 |
@@ -30,7 +31,7 @@
 │  qoderclicn     │                              │  127.0.0.1:3425  │
 └─────────────────┘                              └──────────────────┘
          ↑                                                ↑
-         │ 检测 / 配置（SSH 一次性命令）                      │ provider mgw
+         │ 检测 / 配置（SSH 一次性命令）                      │
          └────────────── 插件后端 ←──────────────────────────┘
                     (Bun 宿主)  ← 页面通过 options 提交任务
 ```
@@ -53,35 +54,13 @@ Plugins → Add a plugin → 选择本目录
 
 插件**不安装任何 npm 依赖**，所有代码用 Node/Bun 内置模块，直接以文件夹形式加载。
 
-安装后：
+安装后打开插件页面 `qoder-ssh`，配置**部署目标**（远端能访问到的网关地址）并添加 SSH 服务器。
 
-1. 在 provider 列表里找到 `Magpie Gateway`（`mgw`），填网关 key（默认 `magpie`）
-2. 打开插件页面 `qoder-ssh`，配置网关地址和远端服务器
-
-验证：
-
-```bash
-magpie provider test mgw
-```
+如果需要把网关接进 magpie 给 agent 用，另装 [magpie-gateway](../magpie-gateway/) 插件。
 
 ## 配置
 
 所有配置存在插件自己的 options 里（magpie 的 `plugins.json` 中该插件条目的 `options`），也可用同名环境变量覆盖。
-
-### 网关桥接
-
-| 配置项 | 环境变量 | 默认值 | 说明 |
-|---|---|---|---|
-| `url` | `MAGPIE_GATEWAY_URL` | `http://127.0.0.1:3425` | 上游网关地址 |
-| `key` | `MAGPIE_GATEWAY_KEY` | `magpie` | 网关 API key |
-
-**自环保护**：如果 `url` 未显式配置，且解析出来就是本机网关（127.0.0.1 / localhost / [::1]，端口等于本机网关端口或 3425/3426），插件不会注册 provider，日志会打印：
-
-```
-qoder-ssh: gateway is this machine, provider not registered (avoids self-loop)
-```
-
-这是有意的——把网关自己再包一层只会多一跳转发，没有任何收益。显式配置了 `url`（指向另一台机器）时不受此限制。
 
 ### SSH 服务器
 

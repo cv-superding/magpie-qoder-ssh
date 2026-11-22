@@ -16,15 +16,10 @@
   </header>
 
   <section class="card">
-    <h2>网关</h2>
-    <p class="hint"><b>本机 provider 用</b>：magpie 的 <code>mgw</code> 从这里取模型。</p>
-    <div class="row">
-      <label>地址 <input id="gw-url" placeholder="http://<gateway-host>:3425"></label>
-      <label>Key <input id="gw-key" type="password" placeholder="magpie"></label>
-    </div>
-
-    <p class="hint"><b>部署给远端用</b>：写进远端 <code>~/.qoder-cn/settings.json</code> 的地址。
-      远端访问不到内网 IP 时，这里要填隧道对端（如 <code>http://127.0.0.1:23425</code>）。</p>
+    <h2>部署目标</h2>
+    <p class="hint">这里配置远端 <code>~/.qoder-cn/settings.json</code> 里的网关地址与 key。
+      远端访问不到内网 IP 时，填隧道对端（如 <code>http://127.0.0.1:23425</code>）。</p>
+    <p class="hint">本机的 <code>mgw</code> provider 由独立的 <b>magpie-gateway</b> 插件提供，不在这里配置。</p>
     <div class="row">
       <label>远端访问地址 <input id="dep-url" placeholder="http://<gateway-host>:3426"></label>
       <label>远端用 Key <input id="dep-key" type="password" placeholder="sk-magpie-key-…"></label>
