@@ -366,8 +366,13 @@ async function main() {
   // 页面初次加载时 <script src="snapshot.js"> 会命中浏览器缓存，
   // 而后端每次 tick 都会重写这个文件（尤其 magpie 重启后）。
   // 这里主动带时间戳重载一次，避免显示过期的 at=0 / "等待后端读取"。
-  await reloadSnapshot()
-  await refresh()
+  // 注意：首次刷新失败绝不能阻断下面的事件绑定，否则所有按钮都点不动。
+  try {
+    await reloadSnapshot()
+    await refresh()
+  } catch (e) {
+    console.warn("qoder-ssh: initial refresh failed", e)
+  }
 
   // 网关保存
   const saveGw = document.getElementById("save-gw")
