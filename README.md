@@ -2,7 +2,7 @@
 
 一个 [magpie](https://github.com/) 插件，通过 SSH 管理远端机器上的 [qoderclicn](https://qoder.com/)：连通性检测、一键安装配置、以及一条 SSH 远程转发隧道。
 
-> **v3.0.0 起，网关桥接已拆到独立插件 [magpie-gateway](../magpie-gateway/)**。本插件不再注册 provider，只负责 SSH 管理。两个插件互相独立，按需安装。
+> **v3.0.0 起，网关桥接已拆到独立插件 [magpie-gateway](https://github.com/cv-superding/magpie-gateway)**。本插件不再注册 provider，只负责 SSH 管理。两个插件互相独立，按需安装。
 
 适用于这类场景：
 
@@ -10,7 +10,7 @@
 - 远端服务器没有公网 IP，需要一个反向隧道访问本机网关
 - 需要批量检测远端的 qoderclicn 安装与配置状态
 
-若只是想把网关接进 magpie 给 agent 用，装 [magpie-gateway](../magpie-gateway/) 即可，不需要本插件。
+若只是想把网关接进 magpie 给 agent 用，装 [magpie-gateway](https://github.com/cv-superding/magpie-gateway) 即可，不需要本插件。
 
 ## 特性
 
@@ -56,7 +56,7 @@ Plugins → Add a plugin → 选择本目录
 
 安装后打开插件页面 `qoder-ssh`，配置**部署目标**（远端能访问到的网关地址）并添加 SSH 服务器。
 
-如果需要把网关接进 magpie 给 agent 用，另装 [magpie-gateway](../magpie-gateway/) 插件。
+如果需要把网关接进 magpie 给 agent 用，另装 [magpie-gateway](https://github.com/cv-superding/magpie-gateway) 插件。
 
 ## 配置
 
