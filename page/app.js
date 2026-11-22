@@ -39,15 +39,46 @@ async function reloadSnapshot() {
   })
 }
 
+// ── options bridge 兼容层 ──────────────────────────────────────────────
+// magpie 桌面客户端注入完整的 magpie.options；但 magpie web 视图（3431）里
+// magpie 对象存在却**没有 options**，直接调 .get() 会抛 TypeError，导致
+// refresh() 和所有按钮回调整体崩掉。这里统一探测，缺失时返回空对象，
+// 页面改从 snapshot.js 读状态（后端每 5 秒写一次，数据齐全）。
+function optionsApi() {
+  const m = (typeof magpie !== "undefined" && magpie) || {}
+  for (const c of [m.options, m.pluginOptions, m.page && m.page.options]) {
+    if (c && typeof c.get === "function" && typeof c.set === "function") return c
+  }
+  return null
+}
+
+function optionsAvailable() {
+  return !!optionsApi()
+}
+
+async function getOptions() {
+  const api = optionsApi()
+  if (!api) return {}
+  try {
+    return (await api.get()) || {}
+  } catch {
+    return {}
+  }
+}
+
 // options 写入节流：magpie 限制 set 最多一秒一次
 let lastSet = 0
 async function saveOptions(patch) {
+  const api = optionsApi()
+  if (!api) {
+    throw new Error("当前是 magpie web 视图，不支持修改配置；请在 magpie 桌面客户端里操作")
+  }
   const wait = 1000 - (Date.now() - lastSet)
   if (wait > 0) await new Promise((r) => setTimeout(r, wait))
-  const cur = (await magpie.options.get()) || {}
+  const cur = await getOptions()
   const next = { ...cur, ...patch }
   lastSet = Date.now()
-  return magpie.options.set(next)
+  return api.set(next)
 }
 
 // 正在检测的服务器 id：页面每 5 秒重绘，靠这个保住「检查中…」状态
@@ -215,7 +246,7 @@ function renderServers(servers, snap) {
       if (!confirm("删除服务器 " + (s.name || s.id) + " ？（同时清除它的密码）")) return
       btnDel.disabled = true
       try {
-        const opts = (await magpie.options.get()) || {}
+        const opts = await getOptions()
         const keep = readServers(opts).filter((x) => x.id !== s.id)
         await saveOptions({ servers: keep, removeSecret: s.id })
         await refresh()
@@ -231,7 +262,7 @@ function renderServers(servers, snap) {
 }
 
 async function refresh() {
-  const opts = (await magpie.options.get()) || {}
+  const opts = await getOptions()
   const snap = snapshot()
 
   const depUrlInput = document.getElementById("dep-url")
@@ -256,7 +287,9 @@ async function refresh() {
     lf.value = opts.logFile || (snap.log && snap.log.file) || ""
   }
 
-  show("snap-at", snap.at ? "后端快照：" + fmtAgo(snap.at) : "等待后端第一次探测…")
+  show("snap-at", optionsAvailable()
+    ? (snap.at ? "后端快照：" + fmtAgo(snap.at) : "等待后端第一次探测…")
+    : "只读模式（web 视图）｜快照：" + (snap.at ? fmtAgo(snap.at) : "加载中"))
 }
 
 // 隧道面板
@@ -367,15 +400,18 @@ function renderTestResult(trOrAll) {
 }
 
 async function main() {
-  // magpie.ready 在某些 web 视图下可能永久 pending；加超时兜底，
-  // 否则整个 main 卡在第一行，下面所有按钮事件都不会绑定（表现为按钮全死）。
+  // magpie web 视图只注入了部分 bridge：magpie.options 不存在，ready 也可能没有。
+  // 全部加保护，绝不让初始化中断事件绑定。
+  const m = (typeof magpie !== "undefined" && magpie) || {}
   try {
-    await Promise.race([
-      magpie.ready,
-      new Promise((r) => setTimeout(r, 2000)),
-    ])
+    if (m.ready) {
+      await Promise.race([
+        m.ready,
+        new Promise((r) => setTimeout(r, 2000)),
+      ])
+    }
   } catch (e) {
-    // ready 失败也继续，下面操作会自己报错
+    console.warn("qoder-ssh: magpie.ready failed", e)
   }
 
   // 页面初次加载时 <script src="snapshot.js"> 会命中浏览器缓存，
@@ -426,7 +462,7 @@ async function main() {
     tunToggle.addEventListener("click", async () => {
       tunToggle.disabled = true
       try {
-        const opts = (await magpie.options.get()) || {}
+        const opts = await getOptions()
         const cfg = opts.tunnel || {}
         const sel = document.getElementById("tun-srv")
         const rp = document.getElementById("tun-rport")
@@ -503,7 +539,7 @@ async function main() {
 
       addBtn.disabled = true
       try {
-        const opts = (await magpie.options.get()) || {}
+        const opts = await getOptions()
         const servers = readServers(opts)
         const id = "s" + Date.now().toString(36)
         servers.push({ id, name: name || host, host: host.trim(), port: port || 22, user: user.trim() })
