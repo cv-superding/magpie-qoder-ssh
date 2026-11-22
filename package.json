@@ -1,0 +1,47 @@
+{
+  "name": "qoder-ssh",
+  "version": "2.7.0",
+  "description": "qoder-ssh: bridge a magpie gateway into magpie as a provider, plus a page to manage SSH servers and configure qoderclicn on them",
+  "type": "module",
+  "main": "./index.mjs",
+  "files": [
+    "index.mjs",
+    "agent.mjs",
+    "lib/secrets.mjs",
+    "lib/tunnel.mjs",
+    "lib/ssh.mjs",
+    "page/index.html",
+    "page/app.js",
+    "page/style.css",
+    "page/snapshot.js",
+    "README.md"
+  ],
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "magpie",
+    "magpie-plugin",
+    "gateway",
+    "openai-compatible",
+    "ssh"
+  ],
+  "license": "MIT",
+  "magpie": {
+    "name": "qoder-ssh",
+    "summary": {
+      "en": "Bridge a magpie gateway as a provider, and manage SSH servers that run qoderclicn",
+      "zh": "把 magpie 网关桥接成 provider，并管理运行 qoderclicn 的 SSH 服务器"
+    },
+    "page": {
+      "title": "qoder-ssh",
+      "file": "page/index.html",
+      "titles": {
+        "zh": "qoder-ssh",
+        "zh-TW": "qoder-ssh",
+        "ja": "qoder-ssh"
+      }
+    },
+    "maxConcurrency": 8,
+    "agent": "./agent.mjs"
+  }
+}

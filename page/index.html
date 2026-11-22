@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>qoder-ssh</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="_magpie/bridge.js"></script>
+  <script src="snapshot.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>qoder-ssh</h1>
+    <p class="sub">管理 SSH 服务器：检测连通性、一键配置 qoderclicn 指向本机 magpie 网关。</p>
+  </header>
+
+  <section class="card">
+    <h2>网关</h2>
+    <p class="hint"><b>本机 provider 用</b>：magpie 的 <code>mgw</code> 从这里取模型。</p>
+    <div class="row">
+      <label>地址 <input id="gw-url" placeholder="http://<gateway-host>:3425"></label>
+      <label>Key <input id="gw-key" type="password" placeholder="magpie"></label>
+    </div>
+
+    <p class="hint"><b>部署给远端用</b>：写进远端 <code>~/.qoder-cn/settings.json</code> 的地址。
+      远端访问不到内网 IP 时，这里要填隧道对端（如 <code>http://127.0.0.1:23425</code>）。</p>
+    <div class="row">
+      <label>远端访问地址 <input id="dep-url" placeholder="http://<gateway-host>:3426"></label>
+      <label>远端用 Key <input id="dep-key" type="password" placeholder="sk-magpie-key-…"></label>
+    </div>
+
+    <button id="save-gw" class="primary">保存</button>
+    <span id="gw-state" class="state"></span>
+  </section>
+
+  <section class="card">
+    <h2>服务器 <span id="srv-count" class="count"></span></h2>
+    <div id="srv-list"></div>
+    <div id="test-result"></div>
+
+    <details class="add">
+      <summary>添加服务器</summary>
+      <div class="row">
+        <label>名称 <input id="new-name" placeholder="qdai"></label>
+        <label>主机 <input id="new-host" placeholder="qdai.scnet.cn"></label>
+        <label>端口 <input id="new-port" type="number" value="22"></label>
+        <label>用户 <input id="new-user" placeholder="root"></label>
+        <label>密码 <input id="new-pass" type="password"></label>
+      </div>
+      <button id="add-srv" class="primary">添加</button>
+      <span id="add-state" class="state"></span>
+    </details>
+
+    <p class="hint">
+      状态每 20 秒自动刷新一次（后端探测）。密码存在 magpie 配置目录下
+      <code>qoder-ssh-secrets.json</code>，权限 600，不会写进 plugins.json。
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>隧道</h2>
+    <p class="hint">在这台机器上建一条 <code>ssh -R</code>：远端 <code>127.0.0.1:23425</code> →
+      本机 <code>127.0.0.1:3426</code>（magpie 网关）。远端服务器据此访问模型，不依赖 Win11。</p>
+    <div class="row">
+      <label>服务器 <select id="tun-srv"></select></label>
+      <label>远端端口 <input id="tun-rport" type="number" value="23425"></label>
+      <label>本机端口 <input id="tun-lport" type="number" value="3426"></label>
+    </div>
+    <button id="tun-toggle" class="primary">启动隧道</button>
+    <span id="tun-state" class="state"></span>
+    <div id="tun-info" class="hint"></div>
+  </section>
+
+  <section class="card">
+    <h2>运行日志</h2>
+    <div class="row">
+      <label>行数
+        <select id="log-lines">
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="30" selected>30（默认）</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
+      <label class="grow">日志文件
+        <input id="log-file" placeholder="F:\Code\...\qoder-ssh\gw.log">
+      </label>
+    </div>
+    <p class="hint">隧道脚本用 <code>python gateway_bridge.py --log-file gw.log</code> 启动，日志才会落盘到这里。
+      本机可填绝对路径；不填则自动查找。</p>
+    <pre id="log-view" class="log">（等待后端读取…）</pre>
+    <div id="log-meta" class="hint"></div>
+  </section>
+
+  <section class="card">
+    <h2>教程：命令安装 qoderclicn 最新版</h2>
+    <p class="hint">下面是在 SSH 服务器上手动安装的完整步骤。页面上的「配置 qoderclicn」按钮做的就是这些事。</p>
+
+    <ol class="steps">
+      <li>
+        <b>确认有 curl 和 python3</b>
+        <pre><code>curl --version | head -1
+python3 --version</code></pre>
+      </li>
+      <li>
+        <b>装官方安装脚本</b>（自动选 amd64/arm64 原生二进制，不需要 Node.js）
+        <pre><code>curl -fsSL https://static.qoder.com.cn/qoder-cli-cn/install.sh | bash</code></pre>
+        <p class="hint">升级到最新版加 <code>--force</code>：
+          <code>curl -fsSL https://static.qoder.com.cn/qoder-cli-cn/install.sh | bash -s -- --force</code>；
+          已装过的也可以 <code>qodercn update</code>。</p>
+      </li>
+      <li>
+        <b>验证安装</b>
+        <pre><code>export PATH="$HOME/.local/bin:$PATH"
+qoderclicn --version   # 或 qodercn --version</code></pre>
+      </li>
+      <li>
+        <b>写入 magpie provider</b>（把地址换成你的网关，远端访问不到内网时用隧道地址）
+        <pre><code>python3 - &lt;&lt;'PY'
+import json, os
+p = os.path.expanduser("~/.qoder-cn/settings.json")
+os.makedirs(os.path.dirname(p), exist_ok=True)
+d = json.load(open(p)) if os.path.exists(p) else {}
+d.setdefault("providers", {})["magpie"] = {
+    "type": "openai-compatible", "protocol": "openai", "authType": "bearer",
+    "baseUrl": "http://127.0.0.1:23425/v1",
+    "apiKey": "sk-magpie-key-…",
+    "displayName": "magpie",
+}
+d.setdefault("ui", {})["language"] = "zh-CN"
+json.dump(d, open(p, "w"), ensure_ascii=False, indent=2)
+print("WROTE", p)
+PY</code></pre>
+      </li>
+      <li>
+        <b>验证能用</b>
+        <pre><code>qoderclicn --list-models
+qoderclicn -p --model "magpie/&lt;模型&gt;" "只回复两个字：通了"</code></pre>
+      </li>
+    </ol>
+
+    <p class="hint"><b>关于隧道</b>：如果远端是公网机、访问不到网关的内网地址，需要先建一条隧道
+      （如 <code>gateway_bridge.py</code>，把远端 23425 转到网关），上面第 4 步的
+      <code>baseUrl</code> 才填 <code>http://127.0.0.1:23425/v1</code>。</p>
+  </section>
+
+  <section class="card">
+    <h2>说明</h2>
+    <ul class="notes">
+      <li><b>已连网关</b>：本机 magpie 的 <code>mgw</code> provider，模型名 <code>mgw/&lt;模型&gt;</code>。</li>
+      <li><b>一键配置</b>会在远端执行：装 qoderclicn（需远端有 npm）→ 写 <code>~/.qoder-cn/settings.json</code> 指向网关地址。</li>
+      <li><b>隧道不在这个插件里</b>：远端要能访问网关地址，仍需 <code>gateway_bridge.py</code> 之类的通道。</li>
+    </ul>
+  </section>
+
+  <footer><span id="snap-at"></span></footer>
+</body>
+</html>
